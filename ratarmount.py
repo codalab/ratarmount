@@ -1824,7 +1824,7 @@ class DummyFuseOperations:
 FuseOperations = fuse.Operations if 'fuse' in sys.modules else DummyFuseOperations
 
 
-class TarMount(FuseOperations):
+class TarMount(FuseOperations):  # type: ignore
     """
     This class implements the fusepy interface in order to create a mounted file system view
     to a TAR archive.
