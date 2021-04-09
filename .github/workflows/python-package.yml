@@ -42,36 +42,36 @@ jobs:
         python3 setup.py sdist bdist_wheel
         twine check dist/*
         python3 -m pip install "$( find dist -name '*.tar.gz' | head -1 )[full]"
-    # - name: Test Simple Startup
-    #   run: |
-    #     ratarmount --help
-    #     ratarmount --version
-    #     ratarmount tests/single-file.tar mimi; sleep 1s; fusermount -u mimi
-    # - name: Style Check With Black
-    #   run: |
-    #     black -q --diff --line-length 120 --skip-string-normalization ratarmount.py > black.diff
-    #     ! [ -s black.diff ]
-    # - name: Lint With Flake8
-    #   run: flake8 *.py
-    # - name: Lint With Pylint
-    #   run: |
-    #     pylint *.py | tee pylint.log
-    #     ! 'egrep' ': E[0-9]{4}: ' pylint.log
-    #   if: matrix.python-version != '3.9' # because of this bug https://github.com/PyCQA/pylint/issues/3882
-    # - name: Lint With Pytype
-    #   run: pytype -d import-error ratarmount.py
-    #   if: matrix.python-version != '3.9' # "Python versions > 3.7 are not yet supported."
-    # - name: Lint With Mypy
-    #   run: mypy *.py
-    # - name: Lint With ShellCheck
-    #   run: shellcheck -e SC2064 tests/*.sh
-    # - name: Test Startup Without Compression Dependencies
-    #   run: |
-    #     # Segfaults (139) are not allowed but other exit codes are valid!
-    #     python3 ratarmount.py tests/simple.bz2 || [ $? != 139 ]
-    # - name: Regression Tests
-    #   run: |
-    #     bash tests/runtests.sh
+    - name: Test Simple Startup
+      run: |
+        ratarmount --help
+        ratarmount --version
+        ratarmount tests/single-file.tar mimi; sleep 1s; fusermount -u mimi
+    - name: Style Check With Black
+      run: |
+        black -q --diff --line-length 120 --skip-string-normalization ratarmount.py > black.diff
+        ! [ -s black.diff ]
+    - name: Lint With Flake8
+      run: flake8 *.py
+    - name: Lint With Pylint
+      run: |
+        pylint *.py | tee pylint.log
+        ! 'egrep' ': E[0-9]{4}: ' pylint.log
+      if: matrix.python-version != '3.9' # because of this bug https://github.com/PyCQA/pylint/issues/3882
+    - name: Lint With Pytype
+      run: pytype -d import-error ratarmount.py
+      if: matrix.python-version != '3.9' # "Python versions > 3.7 are not yet supported."
+    - name: Lint With Mypy
+      run: mypy *.py
+    - name: Lint With ShellCheck
+      run: shellcheck -e SC2064 tests/*.sh
+    - name: Test Startup Without Compression Dependencies
+      run: |
+        # Segfaults (139) are not allowed but other exit codes are valid!
+        python3 ratarmount.py tests/simple.bz2 || [ $? != 139 ]
+    - name: Regression Tests
+      run: |
+        bash tests/runtests.sh
     - name: Module tests without fusepy
       run: |
         pip uninstall -y fusepy
