@@ -374,6 +374,9 @@ class SQLiteIndexedTar:
                 raise ValueError("At least one of tarFileName and fileObject arguments should be set!")
             self.tarFileName = os.path.abspath(tarFileName) if tarFileName else '<file object>'
             fileObject = open(self.tarFileName, 'rb')
+        elif tarFileName:
+            # If tarFileName was specified for a file object, set self.tarFileName accordingly.
+            self.tarFileName = tarFileName
 
         fileObject.seek(0, io.SEEK_END)
         fileSize = fileObject.tell()
