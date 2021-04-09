@@ -74,5 +74,5 @@ jobs:
     #     bash tests/runtests.sh
     - name: Module tests without fusepy
       run: |
-        pip uninstall fusepy
+        pip uninstall -y fusepy
         python3 tests/tests.py
