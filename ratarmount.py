@@ -1085,7 +1085,9 @@ class SQLiteIndexedTar:
                 result = tmpFileObject.read(size)
             else:
                 print("tarfile.extractfile returned nothing!")
-                raise fuse.FuseOSError(fuse.errno.EIO) if "fuse" in sys.modules else Exception("tarfile.extractfile returned nothing!")
+                raise fuse.FuseOSError(fuse.errno.EIO) if "fuse" in sys.modules else Exception(
+                    "tarfile.extractfile returned nothing!"
+                )
         return result
 
     def _tryAddParentFolders(self, path: str) -> None:
@@ -1802,11 +1804,22 @@ class FolderMountSource:
 class DummyFuseOperations:
     """A dummy class that is used to replace
     fuse.Operations if fusepy is not installed."""
-    def init(self): pass
-    def getattr(self): pass
-    def read(self): pass
-    def readdir(self): pass
-    def readlink(self): pass
+
+    def init(self):
+        pass
+
+    def getattr(self):
+        pass
+
+    def read(self):
+        pass
+
+    def readdir(self):
+        pass
+
+    def readlink(self):
+        pass
+
 
 FuseOperations = fuse.Operations if 'fuse' in sys.modules else DummyFuseOperations
 
