@@ -104,7 +104,8 @@ with tempfile.NamedTemporaryFile(
     
     kwargs_set = {
         "\tTest with file paths": dict(fileObject=None, tarFileName=tmp_tar_file.name),
-        "\tTest with file objects": dict(fileObject=open(tmp_tar_file.name, "rb"), tarFileName="tarFileName")
+        "\tTest with file objects": dict(fileObject=open(tmp_tar_file.name, "rb"), tarFileName="tarFileName"),
+        "\tTest with file objects with no fileno": dict(fileObject=io.BytesIO(open(tmp_tar_file.name, "rb")), tarFileName="tarFileName")
     }
 
     for name, kwargs in kwargs_set.items():
