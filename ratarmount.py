@@ -355,6 +355,7 @@ class SQLiteIndexedTar:
         # stores which parent folders were last tried to add to database and therefore do exist
         self.parentFolderCache: List[Tuple[str, str]] = []
         self.sqlConnection: Optional[sqlite3.Connection] = None
+        self.indexFileName = None
 
         # fmt: off
         self.mountRecursively           = recursive
@@ -365,21 +366,15 @@ class SQLiteIndexedTar:
         self.gzipSeekPointSpacing       = gzipSeekPointSpacing
         # fmt: on
 
-        if not tarFileName:
-            if not fileObject:
-                raise ValueError("At least one of tarFileName and fileObject arguments should be set!")
-            self.tarFileName = '<file object>'
-            self._createIndex(fileObject)
-            # return here because we can't find a save location without any identifying name
-            return
-
-        self.tarFileName = os.path.abspath(tarFileName)
-        fileSize = None
         if not fileObject:
+            if not tarFileName:
+                raise ValueError("At least one of tarFileName and fileObject arguments should be set!")
+            self.tarFileName = os.path.abspath(tarFileName) if tarFileName else '<file object>'
             fileObject = open(self.tarFileName, 'rb')
-            fileObject.seek(0, io.SEEK_END)
-            fileSize = fileObject.tell()
-            fileObject.seek(0)
+
+        fileObject.seek(0, io.SEEK_END)
+        fileSize = fileObject.tell()
+        fileObject.seek(0)
 
         # rawFileObject : Only set when opening a compressed file and only kept to keep the
         #                 compressed file handle from being closed by the garbage collector.
@@ -403,6 +398,12 @@ class SQLiteIndexedTar:
             except Exception:
                 pass
 
+        if not tarFileName:
+            self.tarFileName = '<file object>'
+            self._createIndex(fileObject)
+            # return here because we can't find a save location without any identifying name
+            return
+
         # will be used for storing indexes if current path is read-only
         possibleIndexFilePaths = [self.tarFileName + ".index.sqlite"]
         indexPathAsName = self.tarFileName.replace("/", "_") + ".index.sqlite"
@@ -420,7 +421,6 @@ class SQLiteIndexedTar:
                     indexPath = os.path.join(folder, indexPathAsName)
                     possibleIndexFilePaths.append(os.path.abspath(os.path.expanduser(indexPath)))
 
-        self.indexFileName = None
         if clearIndexCache:
             for indexPath in possibleIndexFilePaths:
                 if os.path.isfile(indexPath):
@@ -1024,7 +1024,7 @@ class SQLiteIndexedTar:
             """.format(
                 'DESC' if fileVersion is None or fileVersion <= 0 else 'ASC'
             ),
-            (path, name, 0 if fileVersion is None else fileVersion - 1 if fileVersion > 0 else fileVersion),
+            (path, name, 0 if fileVersion is None else fileVersion - 1 if fileVersion > 0 else -fileVersion),
         ).fetchone()
         return self._rowToFileInfo(row) if row else None
 
@@ -1970,13 +1970,21 @@ class TarMount(fuse.Operations):
 
     @overrides(fuse.Operations)
     def getattr(self, path: str, fh=None) -> Dict[str, Any]:
-        fileInfo, filePath, _ = self._getFileInfo(path)
+        fileInfo, _, filePath = self._getFileInfo(path)
 
         # Dereference hard links
         if not stat.S_ISREG(fileInfo.mode) and not stat.S_ISLNK(fileInfo.mode) and fileInfo.linkname:
             targetLink = '/' + fileInfo.linkname.lstrip('/')
             if targetLink != filePath:
                 return self.getattr(targetLink, fh)
+
+            # If file is referencing itself, try to access earlier version of it
+            versionsInfo = self._decodeVersionsPathAPI(filePath)
+            if not versionsInfo:
+                raise fuse.FuseOSError(fuse.errno.ENOENT)
+            filePath, pathIsSpecialVersionsFolder, fileVersion = versionsInfo
+            # ToDo Leads to recursion if there is only one version linking to itself!
+            return self.getattr(filePath + '.versions/' + str(fileVersion - 1 if fileVersion else -1))
 
         # dictionary keys: https://pubs.opengroup.org/onlinepubs/007904875/basedefs/sys/stat.h.html
         statDict = {"st_" + key: getattr(fileInfo, key) for key in ('size', 'mtime', 'mode', 'uid', 'gid')}
@@ -2034,6 +2042,22 @@ class TarMount(fuse.Operations):
     @overrides(fuse.Operations)
     def read(self, path: str, size: int, offset: int, fh: int) -> bytes:
         fileInfo, mountSource, filePath = self._getFileInfo(path)
+
+        # ToDo avoid this dereferncing duplication in read and getattr by moving it to _getFileInfo or extra method?
+        # ToDo add test triggering this missing link dereferencing on read in contrast to getattr?
+        # Dereference hard links
+        if not stat.S_ISREG(fileInfo.mode) and not stat.S_ISLNK(fileInfo.mode) and fileInfo.linkname:
+            targetLink = '/' + fileInfo.linkname.lstrip('/')
+            if targetLink != filePath:
+                return self.read(targetLink, size, offset, fh)
+
+            # If file is referencing itself, try to access earlier version of it
+            versionsInfo = self._decodeVersionsPathAPI(filePath)
+            if not versionsInfo:
+                raise fuse.FuseOSError(fuse.errno.ENOENT)
+            filePath, pathIsSpecialVersionsFolder, fileVersion = versionsInfo
+            # ToDo Leads to recursion if there is only one version linking to itself!
+            return self.read(filePath + '.versions/' + str(fileVersion - 1 if fileVersion else -1), size, offset, fh)
 
         # mountSource may only be None for the root folder. However, this read method
         # should  only ever be called on files, so mountSource shoult never be None.
